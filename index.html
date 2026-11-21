@@ -8,7 +8,33 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Kunden & Bonus" />
 <title>Kundenkartei & Bonus-App (Auto-Backup OneDrive)</title>
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<script>
+(function() {
+  const msalUrls = [
+    "https://alcdn.msauth.net/browser/2.39.0/js/msal-browser.min.js",
+    "https://alcdn.msauth.net/browser/2.38.4/js/msal-browser.min.js",
+    "https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js",
+    "https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.39.0/lib/browser/msal-browser.min.js",
+    "https://unpkg.com/@azure/msal-browser@2.39.0/lib/browser/msal-browser.min.js"
+  ];
+  function tryLoad(idx) {
+    if (typeof window.msal !== "undefined" || idx >= msalUrls.length) return;
+    const s = document.createElement("script");
+    s.src = msalUrls[idx];
+    s.async = false;
+    s.onload = function() {
+      if (typeof window.msal !== "undefined" && typeof initMSAL === "function") {
+        initMSAL();
+      }
+    };
+    s.onerror = function() {
+      tryLoad(idx + 1);
+    };
+    document.head.appendChild(s);
+  }
+  tryLoad(0);
+})();
+</script>
 <style>
   :root {
     --primary: #7c2d36;
@@ -497,6 +523,11 @@
         <button class="btn btn-secondary btn-sm" id="odLogoutBtn" style="display:none; width:100%;" onclick="disconnectOneDrive()">Verbindung trennen</button>
       </div>
 
+      <div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);">
+        <label>Falls alle CDN-Server blockiert sind: <code>msal-browser.min.js</code> lokal laden</label>
+        <input type="file" id="manualMsalInput" accept=".js" onchange="loadManualMsalFile(event)" />
+      </div>
+
       <details>
         <summary>ℹ️ Einmalige Einrichtung der Microsoft Client-ID (2 Minuten)</summary>
         <ol style="font-size:0.82rem; color:var(--muted); padding-left:18px; line-height:1.5; margin-top:8px;">
@@ -714,6 +745,28 @@ let msalInstance = null;
 let msalAccount = null;
 let directFileHandle = null;
 let syncDebounceTimer = null;
+
+
+function loadManualMsalFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const fn = new Function(e.target.result);
+      fn();
+      if (typeof window.msal !== "undefined") {
+        initMSAL();
+        showToast("MSAL-Bibliothek lokal geladen!");
+      } else {
+        showToast("Datei enthielt kein gültiges MSAL-Objekt.");
+      }
+    } catch (err) {
+      showToast("Fehler beim Laden der MSAL-Datei: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
 
 function initApp() {
   const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('schuhhaus_kunden_app_v1');
